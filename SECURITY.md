@@ -4,47 +4,45 @@
 
 Es fundamental comprender el estado de soporte de cada versión de Node.js para tomar decisiones seguras:
 
-### Node.js 14 y 16 (End-of-Life / EOL)
-- **Estado:** Fin de vida oficial (Node 14 finalizó en abril 2023, Node 16 en septiembre 2023).
-- **Riesgo:** **CRÍTICO**. Ya no reciben actualizaciones de seguridad ni correcciones de errores.
-- **Uso:** Estrictamente para mantener *workloads legacy* que no pueden ser migrados a corto plazo. **No usar para proyectos nuevos.**
+### ⚠️ ESTADO DE SOPORTE (Actualizado: 11 Mayo 2026)
 
-### Node.js 18 y 20 (Maintenance LTS)
-- **Estado:** Mantenimiento a largo plazo (LTS).
-- **Riesgo:** BAJO. Reciben parches de seguridad críticos, pero no nuevas funcionalidades.
-- **Uso:** Adecuado para aplicaciones existentes en producción. Se recomienda planificar la migración a versiones Active LTS.
-
-### Node.js 22 (Active LTS)
-- **Estado:** LTS Activo.
-- **Riesgo:** MÍNIMO. Es la versión recomendada corporativamente.
-- **Uso:** **Obligatorio para todos los nuevos proyectos** y migraciones de sistemas *legacy*.
-
-### Node.js 24 (Current)
-- **Estado:** Versión actual (Current).
-- **Riesgo:** MEDIO. Contiene las últimas características pero puede tener inestabilidades. Aún no es LTS.
-- **Uso:** Exclusivamente para pruebas de concepto, evaluación de nuevas características o preparación para futuras migraciones. No recomendado para producción crítica.
+| Versión | Estado Real | Nivel de Riesgo | Acción Requerida |
+| :--- | :--- | :--- | :--- |
+| **Node 14, 16, 18, 20** | **End-of-Life (EOL)** | 🚨 **CRÍTICO** | Migración inmediata. No reciben parches de seguridad. |
+| **Node 22** | **Active LTS** | ✅ **MÍNIMO** | Versión estándar recomendada. |
+| **Node 24** | **Active LTS** | ✅ **MÍNIMO** | Versión estándar recomendada (desde Oct 2025). |
+| **Node 26** | **Current** | ⚠ **MEDIO** | Solo para evaluación (LTS previsto para Oct 2026). |
 
 ## Prácticas de Seguridad Implementadas
 
-### 1. Usuario no-root
+### 1. Ejecución Non-Root Obligatoria
+Todas las imágenes runtime están configuradas para ejecutarse bajo el usuario `nodeuser` con UID/GID 10001. Este usuario carece de privilegios administrativos y tiene asignado `/usr/sbin/nologin` como shell, lo que impide accesos interactivos no autorizados y mitiga el impacto en caso de una ejecución de código arbitrario.
 
-Todas las imágenes se ejecutan bajo el usuario `nodeuser` (UID 10001) en lugar de `root`. Esto previene que una vulnerabilidad en la aplicación comprometa el host.
+### 2. Validación de Integridad Mediante Digests
+Para garantizar builds determinísticos y prevenir ataques de sustitución de imágenes, el uso de tags flotantes (ej. `:latest`) se limita a entornos de desarrollo. En producción, es obligatorio referenciar las imágenes base mediante su Digest SHA256 inmutable. Adicionalmente, se valida el hash de los binarios de Node.js durante la construcción de la imagen base para asegurar que no han sido alterados.
 
-### 2. Gestión de Procesos
+### 3. Gestión de Secretos con BuildKit
+Queda estrictamente prohibido el uso de instrucciones `ARG` o `ENV` para manejar credenciales (como tokens de npm o llaves de API) en los Dockerfiles. En su lugar, se deben utilizar montajes de secretos de BuildKit (`--mount=type=secret`), lo que garantiza que los datos sensibles solo estén disponibles en tiempo de construcción y nunca persistan en las capas finales de la imagen.
 
-Se utiliza `tini` como *entrypoint* para asegurar que Node.js maneje correctamente las señales del sistema (como `SIGTERM`) y evitar procesos "zombie".
+### 4. Minimización de la Superficie de Ataque
+Se emplea la técnica de compilación multi-etapa (multi-stage build) para segregar el entorno de construcción del de ejecución.
 
-### 3. Minimización de Superficie de Ataque
+- **Imágenes dev:** Contienen compiladores (`gcc`, `make`) y herramientas de depuración necesarias únicamente para el build.
+- **Imágenes runtime:** Se excluyen deliberadamente todas las herramientas de desarrollo, utilidades de descarga (`curl`, `wget`) y gestores de paquetes innecesarios, reduciendo drásticamente los vectores de ataque.
 
-Las imágenes `runtime` utilizan compilación multi-etapa (*multi-stage build*) para excluir herramientas de descarga (`curl`, `xz-utils`) del artefacto final. Esto reduce significativamente la superficie de ataque.
+### 5. Control de Procesos y Señales
+Se integra `tini` como proceso de inicio (init process). Esto asegura que Node.js no se ejecute como PID 1, permitiendo una recolección correcta de procesos "zombie" y garantizando que las señales del sistema (como `SIGTERM`) se propaguen adecuadamente para permitir cierres controlados de la aplicación.
 
-### 4. Validación de Integridad
+### 6. Trazabilidad y SBOM (Software Bill of Materials)
+Cada imagen generada debe incluir metadatos OCI estándar para identificar su origen, revisión de Git y fecha de creación. Como parte obligatoria del pipeline de CI/CD, se debe generar un SBOM utilizando herramientas como Syft, proporcionando un inventario completo de todos los componentes instalados para auditorías de seguridad y cumplimiento.
 
-Se valida el hash SHA256 de los binarios de Node.js descargados para asegurar que no han sido modificados.
 
 ### 5. Higiene de Paquetes
 
 Se eliminan las cachés de `apt` en la misma capa de instalación para reducir el tamaño y la retención de datos innecesarios.
+
+
+
 
 ## Escaneo de Vulnerabilidades
 
