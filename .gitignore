@@ -1,0 +1,36 @@
+# Archivos de sistema operativo
+.DS_Store
+Thumbs.db
+
+# Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dependencias
+node_modules/
+
+# Archivos temporales
+.tmp/
+tmp/
+
+# Archivos de construcción
+*.tar
+*.tar.gz
+*.zip
+
+# Secretos
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.cert

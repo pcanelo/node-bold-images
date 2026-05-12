@@ -1,0 +1,12 @@
+-----BEGIN CERTIFICATE-----
+# PLANTILLA DE CERTIFICADO CA CORPORATIVO
+# Este archivo es un placeholder.
+# DEBE ser reemplazado por el certificado raíz (Root CA) real de la empresa.
+# 
+# Instrucciones de reemplazo:
+# 1. Obtener el archivo .crt o .pem del equipo de Seguridad/Infraestructura.
+# 2. Reemplazar el contenido de este archivo con el certificado real.
+# 3. Mantener los encabezados BEGIN CERTIFICATE y END CERTIFICATE.
+# 
+# Advertencia: NO publicar certificados privados reales en repositorios públicos.
+-----END CERTIFICATE-----

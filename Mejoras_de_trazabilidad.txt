@@ -1,0 +1,49 @@
+Agrega estos ARG cerca del inicio, después del FROM por cada docker file :
+
+ARG IMAGE_SOURCE="https://gitlab.example.com/grupo/node-bold-images"
+ARG IMAGE_VERSION="local"
+ARG IMAGE_REVISION="local"
+ARG IMAGE_CREATED="1970-01-01T00:00:00Z"
+ARG IMAGE_LICENSES="UNLICENSED"
+
+Y luego agrega los labels OCI:
+
+LABEL org.opencontainers.image.source="${IMAGE_SOURCE}" \
+      org.opencontainers.image.version="${IMAGE_VERSION}" \
+      org.opencontainers.image.revision="${IMAGE_REVISION}" \
+      org.opencontainers.image.created="${IMAGE_CREATED}" \
+      org.opencontainers.image.licenses="${IMAGE_LICENSES}"
+
+En .gitlab-ci.yml, cambia el docker build para pasar esos datos:
+
+- docker build \
+    --build-arg IMAGE_SOURCE="$CI_PROJECT_URL" \
+    --build-arg IMAGE_VERSION="$CI_COMMIT_SHORT_SHA" \
+    --build-arg IMAGE_REVISION="$CI_COMMIT_SHA" \
+    --build-arg IMAGE_CREATED="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --build-arg IMAGE_LICENSES="UNLICENSED" \
+    -t $REGISTRY_IMAGE/$NODE_VERSION-$IMAGE_TYPE:$CI_COMMIT_SHORT_SHA \
+    -f $NODE_VERSION/$IMAGE_TYPE/Dockerfile .
+
+Esto deja trazabilidad clara:
+
+source   → repo GitLab
+version  → short SHA
+revision → commit SHA completo
+created  → fecha UTC del build
+licenses → licencia declarada
+
+en el pipeline::
+
+.build_template: &build_template
+  stage: build
+  image: docker:20.10.16
+  services:
+    - docker:20.10.16-dind
+  script:
+    - docker build --build-arg IMAGE_SOURCE="$CI_PROJECT_URL" --build-arg IMAGE_VERSION="$CI_COMMIT_SHORT_SHA" --build-arg IMAGE_REVISION="$CI_COMMIT_SHA" --build-arg IMAGE_CREATED="$(date -u +%Y-%m-%dT%H:%M:%SZ)" --build-arg IMAGE_LICENSES="UNLICENSED" -t $REGISTRY_IMAGE/$NODE_VERSION-$IMAGE_TYPE:$CI_COMMIT_SHORT_SHA -f $NODE_VERSION/$IMAGE_TYPE/Dockerfile .
+    - docker save $REGISTRY_IMAGE/$NODE_VERSION-$IMAGE_TYPE:$CI_COMMIT_SHORT_SHA > $NODE_VERSION-$IMAGE_TYPE.tar
+  artifacts:
+    paths:
+      - $NODE_VERSION-$IMAGE_TYPE.tar
+    expire_in: 1 hour

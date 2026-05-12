@@ -1,0 +1,9 @@
+# Configuración global de npm para uso corporativo
+# Reemplazar con la URL del registry privado de la empresa
+# registry=https://registry.empresa.com/repository/npm-group/
+# _auth=${NPM_AUTH_TOKEN}
+# always-auth=true
+fund=false
+audit=false
+update-notifier=false
+loglevel=warn

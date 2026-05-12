@@ -1,0 +1,6 @@
+# Forzar LF para todos los archivos de texto
+* text=auto eol=lf
+
+# Asegurar específicamente que los Dockerfiles usen LF
+**/Dockerfile text eol=lf
+*.md text eol=lf

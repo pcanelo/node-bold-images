@@ -1,0 +1,349 @@
+stages:
+  - build
+  - test
+  - push
+
+variables:
+  DOCKER_DRIVER: overlay2
+  REGISTRY_IMAGE: $CI_REGISTRY_IMAGE
+
+.build_template: &build_template
+  stage: build
+  image: docker:20.10.16
+  services:
+    - docker:20.10.16-dind
+  script:
+    - docker build -t $REGISTRY_IMAGE/$NODE_VERSION-$IMAGE_TYPE:$CI_COMMIT_SHORT_SHA -f $NODE_VERSION/$IMAGE_TYPE/Dockerfile .
+    - docker save $REGISTRY_IMAGE/$NODE_VERSION-$IMAGE_TYPE:$CI_COMMIT_SHORT_SHA > $NODE_VERSION-$IMAGE_TYPE.tar
+  artifacts:
+    paths:
+      - $NODE_VERSION-$IMAGE_TYPE.tar
+    expire_in: 1 hour
+
+.test_template: &test_template
+  stage: test
+  image: docker:20.10.16
+  services:
+    - docker:20.10.16-dind
+  script:
+    - docker load < $NODE_VERSION-$IMAGE_TYPE.tar
+    - docker run --rm -e IMAGE_TYPE=$IMAGE_TYPE -v "$CI_PROJECT_DIR/common/scripts/smoke-test.sh:/tmp/smoke-test.sh:ro" $REGISTRY_IMAGE/$NODE_VERSION-$IMAGE_TYPE:$CI_COMMIT_SHORT_SHA sh /tmp/smoke-test.sh
+.push_template: &push_template
+  stage: push
+  image: docker:20.10.16
+  services:
+    - docker:20.10.16-dind
+  script:
+    - docker load < $NODE_VERSION-$IMAGE_TYPE.tar
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker push $REGISTRY_IMAGE/$NODE_VERSION-$IMAGE_TYPE:$CI_COMMIT_SHORT_SHA
+    - docker tag $REGISTRY_IMAGE/$NODE_VERSION-$IMAGE_TYPE:$CI_COMMIT_SHORT_SHA $REGISTRY_IMAGE/$NODE_VERSION-$IMAGE_TYPE:latest
+    - docker push $REGISTRY_IMAGE/$NODE_VERSION-$IMAGE_TYPE:latest
+  only:
+    - main
+
+# Node 14
+build:node14:dev:
+  <<: *build_template
+  variables:
+    NODE_VERSION: "node14"
+    IMAGE_TYPE: "dev"
+
+test:node14:dev:
+  <<: *test_template
+  variables:
+    NODE_VERSION: "node14"
+    IMAGE_TYPE: "dev"
+  needs:
+    - job: build:node14:dev
+      artifacts: true
+
+push:node14:dev:
+  <<: *push_template
+  variables:
+    NODE_VERSION: "node14"
+    IMAGE_TYPE: "dev"
+  needs:
+    - job: build:node14:dev
+      artifacts: true
+    - job: test:node14:dev
+
+build:node14:runtime:
+  <<: *build_template
+  variables:
+    NODE_VERSION: "node14"
+    IMAGE_TYPE: "runtime"
+
+test:node14:runtime:
+  <<: *test_template
+  variables:
+    NODE_VERSION: "node14"
+    IMAGE_TYPE: "runtime"
+  needs:
+    - job: build:node14:runtime
+      artifacts: true
+
+push:node14:runtime:
+  <<: *push_template
+  variables:
+    NODE_VERSION: "node14"
+    IMAGE_TYPE: "runtime"
+  needs:
+    - job: build:node14:runtime
+      artifacts: true
+    - job: test:node14:runtime
+
+# Node 16
+build:node16:dev:
+  <<: *build_template
+  variables:
+    NODE_VERSION: "node16"
+    IMAGE_TYPE: "dev"
+
+test:node16:dev:
+  <<: *test_template
+  variables:
+    NODE_VERSION: "node16"
+    IMAGE_TYPE: "dev"
+  needs:
+    - job: build:node16:dev
+      artifacts: true
+
+push:node16:dev:
+  <<: *push_template
+  variables:
+    NODE_VERSION: "node16"
+    IMAGE_TYPE: "dev"
+  needs:
+    - job: build:node16:dev
+      artifacts: true
+    - job: test:node16:dev
+
+build:node16:runtime:
+  <<: *build_template
+  variables:
+    NODE_VERSION: "node16"
+    IMAGE_TYPE: "runtime"
+
+test:node16:runtime:
+  <<: *test_template
+  variables:
+    NODE_VERSION: "node16"
+    IMAGE_TYPE: "runtime"
+  needs:
+    - job: build:node16:runtime
+      artifacts: true
+
+push:node16:runtime:
+  <<: *push_template
+  variables:
+    NODE_VERSION: "node16"
+    IMAGE_TYPE: "runtime"
+  needs:
+    - job: build:node16:runtime
+      artifacts: true
+    - job: test:node16:runtime
+
+# Node 18
+build:node18:dev:
+  <<: *build_template
+  variables:
+    NODE_VERSION: "node18"
+    IMAGE_TYPE: "dev"
+
+test:node18:dev:
+  <<: *test_template
+  variables:
+    NODE_VERSION: "node18"
+    IMAGE_TYPE: "dev"
+  needs:
+    - job: build:node18:dev
+      artifacts: true
+
+push:node18:dev:
+  <<: *push_template
+  variables:
+    NODE_VERSION: "node18"
+    IMAGE_TYPE: "dev"
+  needs:
+    - job: build:node18:dev
+      artifacts: true
+    - job: test:node18:dev
+
+build:node18:runtime:
+  <<: *build_template
+  variables:
+    NODE_VERSION: "node18"
+    IMAGE_TYPE: "runtime"
+
+test:node18:runtime:
+  <<: *test_template
+  variables:
+    NODE_VERSION: "node18"
+    IMAGE_TYPE: "runtime"
+  needs:
+    - job: build:node18:runtime
+      artifacts: true
+
+push:node18:runtime:
+  <<: *push_template
+  variables:
+    NODE_VERSION: "node18"
+    IMAGE_TYPE: "runtime"
+  needs:
+    - job: build:node18:runtime
+      artifacts: true
+    - job: test:node18:runtime
+
+# Node 20
+build:node20:dev:
+  <<: *build_template
+  variables:
+    NODE_VERSION: "node20"
+    IMAGE_TYPE: "dev"
+
+test:node20:dev:
+  <<: *test_template
+  variables:
+    NODE_VERSION: "node20"
+    IMAGE_TYPE: "dev"
+  needs:
+    - job: build:node20:dev
+      artifacts: true
+
+push:node20:dev:
+  <<: *push_template
+  variables:
+    NODE_VERSION: "node20"
+    IMAGE_TYPE: "dev"
+  needs:
+    - job: build:node20:dev
+      artifacts: true
+    - job: test:node20:dev
+
+build:node20:runtime:
+  <<: *build_template
+  variables:
+    NODE_VERSION: "node20"
+    IMAGE_TYPE: "runtime"
+
+test:node20:runtime:
+  <<: *test_template
+  variables:
+    NODE_VERSION: "node20"
+    IMAGE_TYPE: "runtime"
+  needs:
+    - job: build:node20:runtime
+      artifacts: true
+
+push:node20:runtime:
+  <<: *push_template
+  variables:
+    NODE_VERSION: "node20"
+    IMAGE_TYPE: "runtime"
+  needs:
+    - job: build:node20:runtime
+      artifacts: true
+    - job: test:node20:runtime
+
+# Node 22
+build:node22:dev:
+  <<: *build_template
+  variables:
+    NODE_VERSION: "node22"
+    IMAGE_TYPE: "dev"
+
+test:node22:dev:
+  <<: *test_template
+  variables:
+    NODE_VERSION: "node22"
+    IMAGE_TYPE: "dev"
+  needs:
+    - job: build:node22:dev
+      artifacts: true
+
+push:node22:dev:
+  <<: *push_template
+  variables:
+    NODE_VERSION: "node22"
+    IMAGE_TYPE: "dev"
+  needs:
+    - job: build:node22:dev
+      artifacts: true
+    - job: test:node22:dev
+
+build:node22:runtime:
+  <<: *build_template
+  variables:
+    NODE_VERSION: "node22"
+    IMAGE_TYPE: "runtime"
+
+test:node22:runtime:
+  <<: *test_template
+  variables:
+    NODE_VERSION: "node22"
+    IMAGE_TYPE: "runtime"
+  needs:
+    - job: build:node22:runtime
+      artifacts: true
+
+push:node22:runtime:
+  <<: *push_template
+  variables:
+    NODE_VERSION: "node22"
+    IMAGE_TYPE: "runtime"
+  needs:
+    - job: build:node22:runtime
+      artifacts: true
+    - job: test:node22:runtime
+
+# Node 24
+build:node24:dev:
+  <<: *build_template
+  variables:
+    NODE_VERSION: "node24"
+    IMAGE_TYPE: "dev"
+
+test:node24:dev:
+  <<: *test_template
+  variables:
+    NODE_VERSION: "node24"
+    IMAGE_TYPE: "dev"
+  needs:
+    - job: build:node24:dev
+      artifacts: true
+
+push:node24:dev:
+  <<: *push_template
+  variables:
+    NODE_VERSION: "node24"
+    IMAGE_TYPE: "dev"
+  needs:
+    - job: build:node24:dev
+      artifacts: true
+    - job: test:node24:dev
+
+build:node24:runtime:
+  <<: *build_template
+  variables:
+    NODE_VERSION: "node24"
+    IMAGE_TYPE: "runtime"
+
+test:node24:runtime:
+  <<: *test_template
+  variables:
+    NODE_VERSION: "node24"
+    IMAGE_TYPE: "runtime"
+  needs:
+    - job: build:node24:runtime
+      artifacts: true
+
+push:node24:runtime:
+  <<: *push_template
+  variables:
+    NODE_VERSION: "node24"
+    IMAGE_TYPE: "runtime"
+  needs:
+    - job: build:node24:runtime
+      artifacts: true
+    - job: test:node24:runtime

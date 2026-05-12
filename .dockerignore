@@ -1,0 +1,33 @@
+# Control de versiones
+.git
+.gitignore
+.gitlab-ci.yml
+
+# Dependencias locales
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Entornos y secretos
+.env
+.env.*
+*.pem
+*.key
+*.cert
+
+# Archivos de sistema operativo y editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Documentación y scripts locales
+README.md
+docker-compose.yml
+.dockerignore
+
+# Archivos temporales
+.tmp/
+tmp/
+*.tar
+*.tar.gz

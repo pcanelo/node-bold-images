@@ -1,0 +1,27 @@
+# Licencia Corporativa
+
+Este repositorio y sus contenidos (Dockerfiles, scripts, documentación) son propiedad intelectual de la empresa.
+
+## Uso Autorizado
+
+El acceso y uso de este repositorio está autorizado únicamente para:
+
+1. Empleados y contratistas autorizados de la empresa.
+2. Sistemas de CI/CD corporativos.
+3. Infraestructura de contenedores corporativa.
+
+## Restricciones
+
+Está prohibido:
+
+1. Copiar, modificar o distribuir este repositorio sin autorización explícita.
+2. Utilizar las imágenes fuera del contexto corporativo.
+3. Publicar o compartir este repositorio en plataformas públicas.
+4. Usar el contenido para fines comerciales externos.
+
+## Responsabilidad
+
+Las imágenes se proporcionan "tal cual" sin garantías explícitas o implícitas. El uso de estas imágenes es responsabilidad del equipo consumidor.
+
+Para consultas sobre licencia, contacta al equipo de Arquitectura y Seguridad.
+
