@@ -267,14 +267,14 @@ Cualquier excepción (ej: necesidad de ejecutar como root) requiere:
 
 ## Política de Imágenes Base Debian
 
-### Imágenes Base Permitidas
+### Gestión de Tags y Determinismo
 
-Las imágenes base Debian permitidas son:
+Para equilibrar la seguridad (parches inmediatos) con la reproducibilidad (builds idénticos), se establecen las siguientes normas:
 
-| Versión Debian | Tag | Versiones Node.js | Estado |
-|---|---|---|---|
-| Debian 11 Bullseye Slim | `debian:bullseye-slim` | Node 14, 16 | Permitido |
-| Debian 12 Bookworm Slim | `debian:bookworm-slim` | Node 18, 20, 22, 24 | Permitido |
+1. **Entornos de Desarrollo y Staging:** Se permite el uso de tags flotantes (`debian:bookworm-slim`) para asegurar la adopción rápida de parches de seguridad durante el ciclo de vida del desarrollo.
+2. **Entornos de Producción (Determinismo):** Los archivos Dockerfile destinados a producción **DEBEN** referenciar la imagen mediante su **Digest SHA256**.
+   - *Ejemplo:* `FROM debian:bookworm-slim@sha256:abc123...`
+3. **Automatización de Actualizaciones:** Se recomienda el uso de herramientas como **Renovate** o **Dependabot** para automatizar la rotación de los digests SHA256 de manera controlada, permitiendo que el pipeline valide la integridad antes del despliegue.
 
 ### Formato Permitido
 
@@ -322,27 +322,22 @@ docker build -f node20/runtime/Dockerfile .
 
 ## Política de Versiones Node.js
 
-### Clasificación de Versiones
-
-Las versiones de Node.js se clasifican según su estado oficial en el ciclo de vida:
+### Clasificación de Versiones (Actualizado Mayo 2026)
 
 | Estado | Descripción | Ejemplo | Recomendación |
 |--------|------------|---------|---------------|
-| **Active LTS** | Versión LTS actualmente en soporte activo | Node 22 | ✓ **Recomendado** |
-| **Maintenance LTS** | Versión LTS en fase de mantenimiento | Node 18, 20 | ✓ Permitido con evaluación |
-| **EOL** | Fin de vida, sin soporte oficial | Node 14, 16 | ✗ Solo legacy autorizado |
-| **Current** | Versión actual, no LTS aún | Node 24 | ⚠ PoC y evaluación |
+| **Active LTS** | Versión estable con soporte activo y parches | Node 22, 24 | ✓ **Recomendado** |
+| **Maintenance LTS** | Versión en fase final de soporte | Node 18, 20 | ⚠ Planificar migración |
+| **EOL** | Fin de vida, sin parches de seguridad | Node 14, 16 | ✗ **Prohibido** |
 
 ### Matriz de Decisión
 
-| Versión | Estado | Nuevos Proyectos | Producción | Evaluación | Notas |
-|---------|--------|-----------------|-----------|-----------|-------|
-| Node 14 | EOL | ❌ Prohibido | ⚠ Solo legacy | ❌ No | Fin de vida abril 2023 |
-| Node 16 | EOL | ❌ Prohibido | ⚠ Solo legacy | ❌ No | Fin de vida septiembre 2023 |
-| Node 18 | Maintenance LTS | ⚠ Evaluar | ✓ Sí | ✓ Sí | Seguro, planificar migración |
-| Node 20 | Maintenance LTS | ⚠ Evaluar | ✓ Sí | ✓ Sí | Seguro, planificar migración |
-| Node 22 | Active LTS | ✓ **Obligatorio** | ✓ **Sí** | ✓ Sí | **Recomendado corporativamente** |
-| Node 24 | Current | ❌ No | ❌ No | ✓ Sí | PoC y evaluación únicamente |
+| Versión | Estado | Nuevos Proyectos | Producción | Notas |
+|---------|--------|-----------------|-----------|-------|
+| Node 18 | Maintenance | ❌ No | ⚠ Solo transición | EOL Abril 2025 |
+| Node 20 | Maintenance | ❌ No | ✓ Sí | EOL Abril 2026 |
+| Node 22 | **Active LTS** | ✓ Sí | ✓ **Sí** | **Estándar corporativo** |
+| Node 24 | **Active LTS** | ✓ Sí | ✓ **Sí** | **Estándar corporativo** |
 
 ---
 
@@ -369,6 +364,23 @@ Para utilizar Node 14 o 16 en producción:
 
 ---
 
+## Hardening Avanzado de Contenedores
+
+### Gestión de Secretos en el Build
+- **Prohibición de Secretos en Capas:** Queda estrictamente prohibido pasar tokens de npm, llaves SSH o credenciales mediante instrucciones `ARG` o `ENV`.
+- **Uso de Docker Secrets:** Para la instalación de dependencias privadas, se debe utilizar el montaje de secretos de BuildKit:
+  `RUN --mount=type=secret,id=npmrc,target=/root/.npmrc npm ci`
+
+### Reducción de Capas y Ruido
+- **Uso de `.dockerignore`:** Todo proyecto debe incluir un archivo `.dockerignore` que excluya explícitamente:
+  - Directorios de control de versiones (`.git`).
+  - Archivos de entorno (`.env`).
+  - Documentación local y logs.
+  - El directorio `node_modules` local.
+
+### Privilegios del Sistema (Capabilities)
+- En la medida de lo posible, los contenedores deben ejecutarse sin capacidades de kernel de Linux. En orquestadores como Kubernetes, se debe configurar el `securityContext` para realizar un `drop: ["ALL"]`, permitiendo únicamente las necesarias para la operación del proceso Node.js.
+
 ## Pipeline y CI/CD
 
 ### Requisitos Obligatorios
@@ -380,6 +392,8 @@ Toda imagen generada en el pipeline debe:
 3. **Validar funcionamiento Node.js/npm:** Ejecutar comandos básicos.
 4. **Validar restricciones runtime:** Verificar ausencia de herramientas dev.
 5. **Generar artifacts reproducibles:** Builds determinísticos.
+
+
 
 ### Configuración de Pipeline
 
