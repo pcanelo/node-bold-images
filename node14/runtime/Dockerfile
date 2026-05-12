@@ -1,7 +1,7 @@
 # ETAPA 1: BUILDER (Descarga y Preparación)
 # Usamos el digest que proporcionaste para Debian 11 Bullseye Slim
 # FROM debian@sha256:89400a8b54c93d61bb2f971f1ada1d907b344f2422afabf23699fdf1f162faa0 AS builder
-FROM debian:bullseye-slim
+FROM debian:bullseye-slim AS builder
 ENV NODE_VERSION=14.21.3
 ENV ARCH=x64
 
