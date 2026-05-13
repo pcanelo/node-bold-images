@@ -1,6 +1,6 @@
 # ETAPA 1: BUILDER (Descarga y Preparación)
 # FROM debian@sha256:67b30a61dc87758f0caf819646104f29ecbda97d920aaf5edc834128ac8493d3 AS builder
-FROM debian:bookworm-slim
+FROM debian:bookworm-slim as builder
 ENV NODE_VERSION=20.20.2
 ENV ARCH=x64
 
