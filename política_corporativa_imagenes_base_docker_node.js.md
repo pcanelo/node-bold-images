@@ -1,7 +1,7 @@
 # Política Corporativa de Imágenes Base Docker Node.js
 
-**Versión:** 2.0  
-**Fecha de Publicación:** 11 de Mayo de 2026  
+**Versión:** 3.0  
+**Fecha de Publicación:** 13 de Mayo de 2026  
 **Clasificación:** Interno - Corporativo  
 **Responsable:** Equipo de Arquitectura y Seguridad  
 
@@ -18,16 +18,17 @@
 7. [Política de Imágenes Base Debian](#política-de-imágenes-base-debian)
 8. [Política de Versiones Node.js](#política-de-versiones-nodejs)
 9. [Restricciones de Versiones EOL](#restricciones-de-versiones-eol)
-10. [Pipeline y CI/CD](#pipeline-y-cicd)
-11. [Escaneo de Vulnerabilidades](#escaneo-de-vulnerabilidades)
-12. [Supply Chain Security](#supply-chain-security)
-13. [Trazabilidad OCI](#trazabilidad-oci)
-14. [Excepciones](#excepciones)
-15. [Responsabilidades](#responsabilidades)
-16. [Auditoría y Cumplimiento](#auditoría-y-cumplimiento)
-17. [Herramientas Recomendadas](#herramientas-recomendadas)
-18. [Preguntas Frecuentes](#preguntas-frecuentes)
-19. [Contacto y Soporte](#contacto-y-soporte)
+10. [Hardening Avanzado de Contenedores](#hardening-avanzado-de-contenedores)
+11. [Pipeline y CI/CD](#pipeline-y-cicd)
+12. [Escaneo de Vulnerabilidades](#escaneo-de-vulnerabilidades)
+13. [Supply Chain Security](#supply-chain-security)
+14. [Trazabilidad OCI](#trazabilidad-oci)
+15. [Excepciones](#excepciones)
+16. [Responsabilidades](#responsabilidades)
+17. [Auditoría y Cumplimiento](#auditoría-y-cumplimiento)
+18. [Herramientas Recomendadas](#herramientas-recomendadas)
+19. [Preguntas Frecuentes](#preguntas-frecuentes)
+20. [Contacto y Soporte](#contacto-y-soporte)
 
 ---
 
@@ -39,7 +40,7 @@ Esta política corporativa define las normas, restricciones y buenas prácticas 
 - **Reducción de superficie de ataque:** Minimización de vulnerabilidades mediante hardening.
 - **Trazabilidad:** Auditoría completa de qué imágenes se utilizan y cuándo.
 - **Cumplimiento de estándares corporativos:** Adherencia a políticas de seguridad y gobernanza.
-- **Reproducibilidad:** Builds determinísticos que producen resultados idénticos.
+- **Reproducibilidad:** Builds determinísticos en imágenes de producción.
 - **Control de supply chain:** Prevención de cambios no autorizados en imágenes base.
 - **Uso seguro de contenedores:** Prácticas seguras en desarrollo, testing y producción.
 
@@ -95,19 +96,20 @@ Las imágenes `dev` están diseñadas exclusivamente para:
 Las imágenes `dev` incluyen deliberadamente herramientas que NO están presentes en `runtime`:
 
 - `git` - Control de versiones
-- `curl` / `wget` - Descarga de archivos
-- `gcc` / `g++` - Compiladores C/C++
+- `curl` - Descarga de archivos
+- `g++` - Compilador C++
 - `make` - Automatización de build
 - `python3` - Dependencias de build
-- `build-essential` - Herramientas de compilación
-- Utilidades de diagnóstico (`strace`, `ltrace`, etc.)
+- `procps` - Utilidades de diagnóstico de procesos
+- `iputils-ping` - Diagnóstico de red
+- `netcat-openbsd` - Diagnóstico de conectividad
 - Shell interactivo (`/bin/bash`)
 
 ### Ejemplo de Uso Dev
 
 ```dockerfile
 # Dockerfile de aplicación usando imagen dev para build
-FROM registry.empresa.com/base/node20-dev:latest AS builder
+FROM registry.empresa.com/base/node22-dev:latest AS builder
 
 WORKDIR /app
 COPY package*.json ./
@@ -139,14 +141,14 @@ Las imágenes `runtime` están optimizadas para:
 - **Tamaño reducido:** Menor huella de disco y transferencia de red.
 - **Menor superficie de ataque:** Exclusión de herramientas innecesarias.
 - **Ejecución non-root:** Usuario `nodeuser` (UID 10001), nunca `root`.
-- **Reproducibilidad:** Builds determinísticos con versiones pinned.
+- **Reproducibilidad:** Builds determinísticos con digest SHA256 fijado y versiones pinned de Node.js.
 - **Hardening básico corporativo:** Prácticas de seguridad aplicadas.
 
 ### Ejemplo de Uso Runtime
 
 ```dockerfile
 # Dockerfile de aplicación usando multi-stage build
-FROM registry.empresa.com/base/node20-dev:latest AS builder
+FROM registry.empresa.com/base/node22-dev:latest AS builder
 
 WORKDIR /app
 COPY package*.json ./
@@ -155,7 +157,7 @@ COPY . .
 RUN npm run build
 
 # Etapa final: usar runtime
-FROM registry.empresa.com/base/node20-runtime:latest
+FROM registry.empresa.com/base/node22-runtime:latest
 
 WORKDIR /app
 COPY --from=builder /app/dist ./dist
@@ -175,11 +177,11 @@ CMD ["node", "dist/index.js"]
 ### Razones Técnicas
 
 1. **Mayor superficie de ataque:** Incluyen compiladores, herramientas de debug y utilidades que incrementan vulnerabilidades.
-2. **Herramientas potencialmente peligrosas:** `curl`, `wget`, `git` permiten descargas y modificaciones no autorizadas.
+2. **Herramientas potencialmente peligrosas:** `curl`, `git` permiten descargas y modificaciones no autorizadas.
 3. **Paquetes no necesarios en runtime:** Bloat innecesario que no contribuye a la funcionalidad.
 4. **Mayor tamaño:** 5-10x más grandes que imágenes `runtime`, afectando velocidad de despliegue.
 5. **Mayor exposición a CVEs:** Más dependencias = más vulnerabilidades potenciales.
-6. **Presencia de toolchains de compilación:** gcc, g++, make permiten ejecución de código arbitrario.
+6. **Presencia de toolchains de compilación:** g++, make permiten ejecución de código arbitrario.
 
 ### Consecuencias de Violación
 
@@ -213,10 +215,12 @@ Esto es un requisito de seguridad corporativo no negociable.
 
 ### Especificación
 
-- **Usuario:** `nodeuser`
-- **UID:** `10001`
-- **GID:** `10001`
-- **Shell:** `/usr/sbin/nologin` (sin acceso interactivo)
+| Atributo | Imagen Dev | Imagen Runtime |
+|----------|-----------|----------------|
+| **Usuario** | `nodeuser` | `nodeuser` |
+| **UID** | `10001` | `10001` |
+| **GID** | `10001` | `10001` |
+| **Shell** | `/bin/bash` (interactivo) | `/bin/false` (sin acceso interactivo) |
 
 ### Lo Que NO Está Permitido
 
@@ -228,21 +232,20 @@ USER root
 # (por defecto sería root)
 
 # ❌ NO PERMITIDO: Usuario con shell interactivo en runtime
-USER appuser
+useradd -s /bin/bash nodeuser  # Solo permitido en dev
 ```
 
 ### Lo Que Está Permitido
 
 ```dockerfile
-# ✓ PERMITIDO: Usuario non-root con UID explícito
-RUN groupadd -r nodeuser -g 10001 && \
-    useradd -r -g nodeuser -u 10001 -s /usr/sbin/nologin nodeuser
+# ✓ PERMITIDO en runtime: Usuario non-root sin shell interactivo
+RUN groupadd -g 10001 nodegroup && \
+    useradd -u 10001 -g nodegroup -s /bin/false -m nodeuser
+USER nodeuser
 
-USER nodeuser:nodeuser
-
-# ✓ PERMITIDO: Usar imagen base que ya incluya usuario
-FROM debian:bookworm-slim
-# (la imagen base ya incluye nodeuser)
+# ✓ PERMITIDO en dev: Usuario non-root con shell interactivo
+RUN groupadd -g 10001 nodegroup && \
+    useradd -u 10001 -g nodegroup -s /bin/bash -m nodeuser
 USER nodeuser
 ```
 
@@ -251,7 +254,7 @@ USER nodeuser
 ```bash
 # Verificar que el contenedor se ejecuta con UID 10001
 docker run --rm <image> id
-# Salida esperada: uid=10001(nodeuser) gid=10001(nodeuser) groups=10001(nodeuser)
+# Salida esperada: uid=10001(nodeuser) gid=10001(nodegroup) groups=10001(nodegroup)
 ```
 
 ### Excepciones Documentadas
@@ -267,56 +270,75 @@ Cualquier excepción (ej: necesidad de ejecutar como root) requiere:
 
 ## Política de Imágenes Base Debian
 
-### Gestión de Tags y Determinismo
+### Principio Rector: Seguridad por Contexto
 
-Para equilibrar la seguridad (parches inmediatos) con la reproducibilidad (builds idénticos), se establecen las siguientes normas:
+Esta política establece un enfoque diferenciado para la referencia de imágenes base Debian, equilibrando la **seguridad de actualización** (parches automáticos) con la **seguridad de reproducibilidad** (builds determinísticos). El criterio rector es el contexto de uso:
 
-1. **Entornos de Desarrollo y Staging:** Se permite el uso de tags flotantes (`debian:bookworm-slim`) para asegurar la adopción rápida de parches de seguridad durante el ciclo de vida del desarrollo.
-2. **Entornos de Producción (Determinismo):** Los archivos Dockerfile destinados a producción **DEBEN** referenciar la imagen mediante su **Digest SHA256**.
-   - *Ejemplo:* `FROM debian:bookworm-slim@sha256:abc123...`
-3. **Automatización de Actualizaciones:** Se recomienda el uso de herramientas como **Renovate** o **Dependabot** para automatizar la rotación de los digests SHA256 de manera controlada, permitiendo que el pipeline valide la integridad antes del despliegue.
+| Contexto | Estrategia | Justificación |
+|----------|-----------|---------------|
+| **Imágenes `dev`** | Tag flotante permitido | Prioriza recepción automática de parches; no se despliega en producción. |
+| **Etapa `builder` en runtime** | Tag flotante permitido | Es una etapa intermedia descartable; solo se copian binarios de Node.js. |
+| **Etapa final `runtime`** | **Digest SHA256 obligatorio** | Prioriza reproducibilidad y trazabilidad en producción. |
 
-### Formato Permitido
+> **Nota:** La política de rotación periódica de digests (documento complementario: `política_rotación_de_digests_docker_base.md`) aplica exclusivamente a los digests de las etapas finales runtime.
 
-Se permite el uso de tags flotantes de Debian. Las imágenes base deben referenciarse de la siguiente manera:
+### Formato Permitido por Tipo de Imagen
+
+#### Imágenes Dev y Etapas Builder
 
 ```dockerfile
-# ✓ PERMITIDO: Tag flotante de Debian
+# ✓ PERMITIDO: Tag flotante en imágenes dev
 FROM debian:bullseye-slim
 FROM debian:bookworm-slim
+
+# ✓ PERMITIDO: Tag flotante en etapa builder de runtime
+FROM debian:bookworm-slim AS builder
 ```
 
-### Formato NO Permitido
+**Justificación:** Las imágenes dev no se despliegan en producción. Las etapas builder son descartables (solo se copian binarios compilados a la etapa final). En ambos casos, recibir parches automáticos de Debian es más beneficioso que la reproducibilidad estricta.
+
+#### Etapa Final Runtime (Producción)
 
 ```dockerfile
-# ❌ NO PERMITIDO: Versión específica sin tag slim
+# ✓ OBLIGATORIO: Digest SHA256 en etapa final runtime
+FROM debian@sha256:67b30a61dc87758f0caf819646104f29ecbda97d920aaf5edc834128ac8493d3 AS runtime
+```
+
+**Justificación:** Las imágenes runtime se despliegan en producción. La fijación por digest garantiza:
+- Builds idénticos en cualquier momento.
+- Trazabilidad completa de qué imagen base exacta se utilizó.
+- Control de supply chain: prevención de cambios no autorizados.
+- Auditoría verificable.
+
+### Formato NO Permitido (en ningún contexto)
+
+```dockerfile
+# ❌ NO PERMITIDO: Versión numérica sin tag slim
 FROM debian:11
 FROM debian:12
 
 # ❌ NO PERMITIDO: Tag latest
 FROM debian:latest
+
+# ❌ NO PERMITIDO: Tag flotante en etapa final runtime
+FROM debian:bookworm-slim AS runtime
 ```
 
-### Justificación de Tags Flotantes
+### Selección de Versión Debian por Versión de Node.js
 
-El uso de tags flotantes (`debian:bullseye-slim`, `debian:bookworm-slim`) permite:
+| Versión Node.js | Debian Base | Justificación |
+|----------------|-------------|---------------|
+| Node 14, 16 | Debian 11 Bullseye Slim | Compatibilidad con versiones legacy |
+| Node 18, 20, 22, 24 | Debian 12 Bookworm Slim | Versión estable actual |
 
-- **Recepción automática de parches:** Las imágenes base reciben actualizaciones de seguridad automáticamente.
-- **Menor mantenimiento:** No requiere rotación manual de digests.
-- **Seguridad proactiva:** Vulnerabilidades críticas se parchean sin intervención manual.
-- **Compatibilidad:** Debian mantiene estabilidad en versiones slim.
+### Rotación de Digests
 
-### Actualización de Imágenes Base
+Los digests SHA256 de las etapas runtime **deben rotarse periódicamente** para incorporar parches de seguridad de Debian. El procedimiento detallado se encuentra en el documento complementario: [`política_rotación_de_digests_docker_base.md`](política_rotación_de_digests_docker_base.md).
 
-Las imágenes base Debian se actualizan automáticamente cuando se ejecuta `docker pull`. No se requiere intervención manual para obtener parches de seguridad.
-
-```bash
-# Obtener la última versión de la imagen base
-docker pull debian:bookworm-slim
-
-# Reconstruir imágenes Node.js
-docker build -f node20/runtime/Dockerfile .
-```
+Resumen de frecuencias:
+- **Revisión preventiva:** Mensual.
+- **CVE crítica (CVSS ≥ 9.0):** Inmediata.
+- **Incidente de supply chain:** Inmediata.
 
 ---
 
@@ -327,14 +349,16 @@ docker build -f node20/runtime/Dockerfile .
 | Estado | Descripción | Ejemplo | Recomendación |
 |--------|------------|---------|---------------|
 | **Active LTS** | Versión estable con soporte activo y parches | Node 22, 24 | ✓ **Recomendado** |
-| **Maintenance LTS** | Versión en fase final de soporte | Node 18, 20 | ⚠ Planificar migración |
-| **EOL** | Fin de vida, sin parches de seguridad | Node 14, 16 | ✗ **Prohibido** |
+| **Maintenance LTS** | Versión en fase final de soporte | Node 20 | ⚠ Planificar migración |
+| **EOL** | Fin de vida, sin parches de seguridad | Node 14, 16, 18 | ✗ **Prohibido para nuevos proyectos** |
 
 ### Matriz de Decisión
 
 | Versión | Estado | Nuevos Proyectos | Producción | Notas |
 |---------|--------|-----------------|-----------|-------|
-| Node 18 | Maintenance | ❌ No | ⚠ Solo transición | EOL Abril 2025 |
+| Node 14 | EOL | ❌ No | ⚠ Solo legacy con excepción | EOL Abril 2023 |
+| Node 16 | EOL | ❌ No | ⚠ Solo legacy con excepción | EOL Septiembre 2023 |
+| Node 18 | EOL | ❌ No | ⚠ Solo transición | EOL Abril 2025 |
 | Node 20 | Maintenance | ❌ No | ✓ Sí | EOL Abril 2026 |
 | Node 22 | **Active LTS** | ✓ Sí | ✓ **Sí** | **Estándar corporativo** |
 | Node 24 | **Active LTS** | ✓ Sí | ✓ **Sí** | **Estándar corporativo** |
@@ -347,14 +371,14 @@ docker build -f node20/runtime/Dockerfile .
 
 Las versiones EOL (End-of-Life) tienen restricciones severas:
 
-- **NO deben utilizarse para nuevos proyectos:** Cualquier proyecto nuevo debe usar Node 22 (Active LTS).
+- **NO deben utilizarse para nuevos proyectos:** Cualquier proyecto nuevo debe usar Node 22 o 24 (Active LTS).
 - **NO deben desplegarse sin aceptación explícita de riesgo:** Requiere firma de documento de aceptación.
 - **Deben tener plan de migración documentado:** Roadmap explícito hacia versión LTS activa.
 - **Deben monitorearse con mayor rigurosidad:** Escaneos de vulnerabilidades más frecuentes.
 
 ### Proceso de Autorización para EOL
 
-Para utilizar Node 14 o 16 en producción:
+Para utilizar Node 14, 16 o 18 en producción:
 
 1. **Justificación técnica:** Explicar por qué no se puede migrar.
 2. **Evaluación de riesgo:** Documento formal de riesgos identificados.
@@ -367,11 +391,15 @@ Para utilizar Node 14 o 16 en producción:
 ## Hardening Avanzado de Contenedores
 
 ### Gestión de Secretos en el Build
+
 - **Prohibición de Secretos en Capas:** Queda estrictamente prohibido pasar tokens de npm, llaves SSH o credenciales mediante instrucciones `ARG` o `ENV`.
 - **Uso de Docker Secrets:** Para la instalación de dependencias privadas, se debe utilizar el montaje de secretos de BuildKit:
-  `RUN --mount=type=secret,id=npmrc,target=/root/.npmrc npm ci`
+  ```dockerfile
+  RUN --mount=type=secret,id=npmrc,target=/root/.npmrc npm ci
+  ```
 
 ### Reducción de Capas y Ruido
+
 - **Uso de `.dockerignore`:** Todo proyecto debe incluir un archivo `.dockerignore` que excluya explícitamente:
   - Directorios de control de versiones (`.git`).
   - Archivos de entorno (`.env`).
@@ -379,7 +407,17 @@ Para utilizar Node 14 o 16 en producción:
   - El directorio `node_modules` local.
 
 ### Privilegios del Sistema (Capabilities)
+
 - En la medida de lo posible, los contenedores deben ejecutarse sin capacidades de kernel de Linux. En orquestadores como Kubernetes, se debe configurar el `securityContext` para realizar un `drop: ["ALL"]`, permitiendo únicamente las necesarias para la operación del proceso Node.js.
+
+### Gestor de Procesos (Tini)
+
+- Todas las imágenes utilizan `tini` como `ENTRYPOINT` para:
+  - Manejar correctamente las señales del sistema (SIGTERM, SIGINT).
+  - Prevenir procesos "zombie".
+  - Asegurar un apagado controlado de la aplicación.
+
+---
 
 ## Pipeline y CI/CD
 
@@ -391,9 +429,7 @@ Toda imagen generada en el pipeline debe:
 2. **Validar ejecución non-root:** Verificar UID 10001.
 3. **Validar funcionamiento Node.js/npm:** Ejecutar comandos básicos.
 4. **Validar restricciones runtime:** Verificar ausencia de herramientas dev.
-5. **Generar artifacts reproducibles:** Builds determinísticos.
-
-
+5. **Generar artifacts reproducibles:** Builds determinísticos para runtime.
 
 ### Configuración de Pipeline
 
@@ -404,20 +440,20 @@ stages:
   - test
   - push
 
-build:node20:runtime:
+build:node22:runtime:
   stage: build
   script:
-    - docker build -t $IMAGE:$CI_COMMIT_SHORT_SHA -f node20/runtime/Dockerfile .
-    - docker save $IMAGE:$CI_COMMIT_SHORT_SHA > node20-runtime.tar
+    - docker build -t $IMAGE:$CI_COMMIT_SHORT_SHA -f node22/runtime/Dockerfile .
+    - docker save $IMAGE:$CI_COMMIT_SHORT_SHA > node22-runtime.tar
   artifacts:
     paths:
-      - node20-runtime.tar
+      - node22-runtime.tar
     expire_in: 1 hour
 
-test:node20:runtime:
+test:node22:runtime:
   stage: test
   script:
-    - docker load < node20-runtime.tar
+    - docker load < node22-runtime.tar
     - docker run --rm $IMAGE:$CI_COMMIT_SHORT_SHA node -v
     - docker run --rm $IMAGE:$CI_COMMIT_SHORT_SHA npm -v
     - |
@@ -469,14 +505,14 @@ No está permitido:
 - **Instalar paquetes arbitrarios en producción:** Toda instalación debe estar en Dockerfile.
 - **Usar imágenes externas sin validación corporativa:** Solo imágenes del repositorio oficial.
 
-### Validación de Integridad
+### Validación de Integridad de Binarios Node.js
 
-```bash
-# Verificar que la imagen viene del registry corporativo
-docker inspect <image> | grep -i "registry.empresa.com"
+Todos los Dockerfiles validan la integridad de los binarios de Node.js descargados mediante verificación SHA256 contra el archivo oficial `SHASUMS256.txt` de nodejs.org:
 
-# Verificar que la imagen se ejecuta correctamente
-docker run --rm <image> node -v
+```dockerfile
+RUN curl -fsSLO https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt && \
+    curl -fsSLO https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${ARCH}.tar.xz && \
+    grep " node-v${NODE_VERSION}-linux-${ARCH}.tar.xz\$" SHASUMS256.txt | sha256sum -c -
 ```
 
 ### Trazabilidad de Cambios
@@ -484,7 +520,7 @@ docker run --rm <image> node -v
 Todos los cambios deben ser trazables:
 
 - ✓ Commits en Git con mensajes descriptivos.
-- ✓ Pull requests con revisión de código.
+- ✓ Merge Requests con revisión de código.
 - ✓ Tags de versión anotados.
 - ✓ CHANGELOG.md actualizado.
 - ✓ Tickets de seguimiento (GitLab Issues, Jira).
@@ -500,12 +536,12 @@ Todas las imágenes deben incluir metadata OCI estándar:
 ```dockerfile
 LABEL org.opencontainers.image.source="https://gitlab.empresa.com/platform/node-bold-images"
 LABEL org.opencontainers.image.revision="$CI_COMMIT_SHA"
-LABEL org.opencontainers.image.version="1.0.2"
+LABEL org.opencontainers.image.version="1.0.0"
 LABEL org.opencontainers.image.created="$CI_JOB_TIMESTAMP"
-LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.licenses="Proprietary"
 LABEL org.opencontainers.image.vendor="Empresa Corp"
-LABEL org.opencontainers.image.title="Node.js 20 Runtime Base Image"
-LABEL org.opencontainers.image.description="Corporate base image for Node.js 20 runtime"
+LABEL org.opencontainers.image.title="Node.js 22 Runtime Base Image"
+LABEL org.opencontainers.image.description="Corporate base image for Node.js 22 runtime"
 ```
 
 ### Verificación de Metadata
@@ -556,7 +592,7 @@ Cualquier excepción a esta política requiere cumplir **al menos uno** de los s
 
 | Rol | Responsabilidad |
 |-----|-----------------|
-| **Equipo de Plataforma** | Mantención de imágenes, actualización de versiones Node.js, publicación en registry. |
+| **Equipo de Plataforma** | Mantención de imágenes, actualización de versiones Node.js, publicación en registry, rotación de digests. |
 | **Equipo de Seguridad** | Validación de hardening, escaneo de vulnerabilidades, aprobación de excepciones. |
 | **Equipos de Desarrollo** | Uso correcto de imágenes, reporte de problemas, adopción de nuevas versiones. |
 | **Equipos DevOps** | Integración CI/CD, validación de pipeline, despliegue de imágenes. |
@@ -573,6 +609,7 @@ Todos los cambios deben ser auditables:
 | Elemento | Dónde Registrar | Responsable |
 |----------|-----------------|-------------|
 | Cambios de versión Node.js | Git commits + CHANGELOG.md | Plataforma |
+| Rotación de digests | Git commits + CHANGELOG.md | Plataforma |
 | Nuevas versiones | Tags de versión + CHANGELOG.md | Plataforma |
 | Excepciones | Tickets + CHANGELOG.md | Arquitectura |
 | Vulnerabilidades | Tickets de seguridad | Seguridad |
@@ -583,10 +620,11 @@ Todos los cambios deben ser auditables:
 Se realizarán auditorías trimestrales para verificar:
 
 - ✓ No hay imágenes `dev` desplegadas en producción.
-- ✓ Todas las imágenes se ejecutan como non-root.
+- ✓ Todas las imágenes se ejecutan como non-root (UID 10001).
 - ✓ No hay versiones EOL sin plan de migración.
 - ✓ Escaneos de vulnerabilidades se ejecutan regularmente.
-- ✓ Imágenes base Debian se actualizan regularmente.
+- ✓ Digests de imágenes runtime se rotan según la política de rotación.
+- ✓ Imágenes base Debian están actualizadas.
 
 ---
 
@@ -599,24 +637,29 @@ Se realizarán auditorías trimestrales para verificar:
 | **Syft** | Generación de SBOM (Software Bill of Materials) | https://github.com/anchore/syft |
 | **Snyk** | Monitoreo continuo de vulnerabilidades | https://snyk.io/ |
 | **Dependabot** | Automatización de actualizaciones de dependencias | https://dependabot.com/ |
-| **Renovate** | Automatización de actualizaciones de imágenes base | https://www.whitesourcesoftware.com/free-developer-tools/renovate/ |
+| **Renovate** | Automatización de rotación de digests | https://www.whitesourcesoftware.com/free-developer-tools/renovate/ |
 | **Docker Scout** | Análisis de vulnerabilidades integrado en Docker | https://docs.docker.com/scout/ |
 
 ---
 
 ## Preguntas Frecuentes
 
-### P: ¿Por qué usar tags flotantes en lugar de digests SHA256?
+### P: ¿Por qué se usan tags flotantes en dev pero digests en runtime?
 
-**R:** Los tags flotantes (`debian:bookworm-slim`) permiten que las imágenes base reciban automáticamente parches de seguridad sin intervención manual. Esto simplifica el mantenimiento y reduce la ventana de vulnerabilidades. Los digests fijados requieren rotación manual, lo que puede ser olvidado o retrasado.
+**R:** Es un equilibrio deliberado entre dos necesidades de seguridad:
+- **Dev/Builder:** No se despliegan en producción. Recibir parches automáticos de Debian reduce la ventana de vulnerabilidades durante el desarrollo sin riesgo operativo.
+- **Runtime:** Se despliegan en producción. La fijación por digest garantiza reproducibilidad, trazabilidad y control de supply chain. Los parches se incorporan mediante rotación controlada de digests (ver política de rotación).
 
 ### P: ¿Qué sucede si Debian publica un parche de seguridad?
 
-**R:** Al usar tags flotantes, la próxima vez que se ejecute `docker pull debian:bookworm-slim` o se reconstruya una imagen, se obtendrá automáticamente la versión con el parche. No se requiere intervención manual.
+**R:** Depende del tipo de imagen:
+- **Dev:** La próxima reconstrucción incorporará el parche automáticamente (tag flotante).
+- **Runtime:** Se debe ejecutar una rotación de digest según la política de rotación (mensual o inmediata si es CVE crítica).
 
-### P: ¿Cómo garantizo reproducibilidad sin digests SHA256?
+### P: ¿Cómo garantizo reproducibilidad en runtime?
 
 **R:** La reproducibilidad se logra a través de:
+- Digest SHA256 fijado en la etapa final runtime.
 - Versiones pinned de Node.js en los Dockerfiles.
 - Versiones pinned de dependencias npm (package-lock.json).
 - Pipeline CI/CD que registra qué versión de imagen base se utilizó.
@@ -624,11 +667,11 @@ Se realizarán auditorías trimestrales para verificar:
 
 ### P: ¿Puedo usar Node 14 en un nuevo proyecto?
 
-**R:** No. Node 14 está en EOL desde abril 2023 y no recibe parches de seguridad. Todos los nuevos proyectos deben usar Node 22 (Active LTS).
+**R:** No. Node 14 está en EOL desde abril 2023 y no recibe parches de seguridad. Todos los nuevos proyectos deben usar Node 22 o 24 (Active LTS).
 
 ### P: ¿Qué hago si descubro una vulnerabilidad crítica?
 
-**R:** Escalar inmediatamente al equipo de seguridad. Si es crítica, reconstruir imágenes con la última versión de Debian para obtener parches.
+**R:** Escalar inmediatamente al equipo de seguridad. Si es crítica (CVSS ≥ 9.0), ejecutar rotación inmediata de digests y reconstruir todas las imágenes afectadas.
 
 ### P: ¿Puedo ejecutar una imagen `dev` en producción si la modifico?
 
@@ -638,9 +681,9 @@ Se realizarán auditorías trimestrales para verificar:
 
 **R:** Esto requiere excepción formal. Contactar al equipo de seguridad con justificación técnica. Generalmente, hay formas de lograr el objetivo sin ejecutar como root.
 
-### P: ¿Con qué frecuencia se actualizan las imágenes base?
+### P: ¿Con qué frecuencia se rotan los digests de las imágenes runtime?
 
-**R:** Las imágenes base Debian se actualizan automáticamente cuando se publican parches de seguridad. Las imágenes Node.js se reconstruyen regularmente para incorporar estos parches.
+**R:** Mensualmente de forma preventiva, o inmediatamente ante CVEs críticas. Ver documento complementario: `política_rotación_de_digests_docker_base.md`.
 
 ### P: ¿Cómo verifico que mi imagen cumple con esta política?
 
@@ -655,6 +698,17 @@ docker run --rm <image> node -v && npm -v
 # Escanear vulnerabilidades
 trivy image <image>
 ```
+
+---
+
+## Documentos Complementarios
+
+| Documento | Propósito |
+|-----------|----------|
+| [`política_rotación_de_digests_docker_base.md`](política_rotación_de_digests_docker_base.md) | Procedimiento detallado de rotación de digests SHA256 para imágenes runtime. |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Guía de contribución al repositorio. |
+| [`SECURITY.md`](SECURITY.md) | Política de reporte de vulnerabilidades. |
+| [`CHANGELOG.md`](CHANGELOG.md) | Historial de cambios del repositorio. |
 
 ---
 
@@ -681,11 +735,11 @@ Para preguntas, reportar problemas o solicitar excepciones a esta política:
 | **Arquitectura** | arquitectura@empresa.com | Lineamientos, excepciones, decisiones técnicas |
 | **Seguridad** | security@empresa.com | Validación de hardening, CVEs, aprobación de excepciones |
 | **DevOps** | devops@empresa.com | Pipeline, despliegue, integración CI/CD |
-| **Plataforma** | platform@empresa.com | Mantenimiento de imágenes, actualizaciones |
+| **Plataforma** | platform@empresa.com | Mantenimiento de imágenes, actualizaciones, rotación de digests |
 
 ---
 
-**Documento versión 2.0 | Última actualización: 11 de Mayo de 2026 | Clasificación: Interno - Corporativo**
+**Documento versión 3.0 | Última actualización: 13 de Mayo de 2026 | Clasificación: Interno - Corporativo**
 
 **Aprobado por:** Equipo de Arquitectura y Seguridad  
-**Próxima revisión:** 11 de Agosto de 2026
+**Próxima revisión:** 13 de Agosto de 2026
