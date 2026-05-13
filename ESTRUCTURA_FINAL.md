@@ -12,7 +12,12 @@ node-bold-images/
 ├── CHANGELOG.md                       # Historial de cambios
 ├── LICENSE                            # Licencia corporativa
 ├── ESTRUCTURA_FINAL.md                # Este archivo
+├── EJEMPLO NODE 14.md                 # Guía técnica de ejemplo para Node.js 14
+├── Mejoras_de_trazabilidad.txt        # Instrucciones pendientes para labels OCI
+├── política_corporativa_imagenes_base_docker_node.js.md  # Política corporativa
+├── política_rotación_de_digests_docker_base.md           # Política de rotación de digests
 ├── .gitlab-ci.yml                     # Pipeline GitLab CI/CD
+├── .gitattributes                     # Atributos de Git
 ├── .gitignore                         # Archivos ignorados por Git
 ├── .dockerignore                      # Archivos ignorados por Docker
 │
@@ -23,39 +28,41 @@ node-bold-images/
 │   │   └── empresa-root-ca.crt        # Certificado raíz (placeholder)
 │   └── scripts/                       # Scripts de utilidad
 │       ├── verify-node-sha256.sh      # Verificación de integridad (placeholder)
-│       └── smoke-test.sh              # Pruebas de humo (placeholder)
+│       └── smoke-test.sh              # Pruebas de humo (usado en CI)
 │
 ├── node14/                            # Node.js 14 (EOL)
 │   ├── dev/
 │   │   └── Dockerfile                 # Imagen de desarrollo
-│   └── runtime/
-│       └── Dockerfile                 # Imagen de producción
+│   ├── runtime/
+│   │   └── Dockerfile                 # Imagen de producción
+│   └── tips_run_manual_14.md          # Tips para construcción manual local
 │
-├── node16/                            # Node.js 16
+├── node16/                            # Node.js 16 (EOL)
+│   ├── dev/
+│   │   └── Dockerfile                 # Imagen de desarrollo
+│   ├── runtime/
+│   │   └── Dockerfile                 # Imagen de producción
+│   └── tips_run_manual_16.md          # Tips para construcción manual local
+│
+├── node18/                            # Node.js 18 (EOL)
 │   ├── dev/
 │   │   └── Dockerfile                 # Imagen de desarrollo
 │   └── runtime/
 │       └── Dockerfile                 # Imagen de producción
 │
-├── node18/                            # Node.js 18 (LTS)
+├── node20/                            # Node.js 20 (Maintenance LTS)
 │   ├── dev/
 │   │   └── Dockerfile                 # Imagen de desarrollo
 │   └── runtime/
 │       └── Dockerfile                 # Imagen de producción
 │
-├── node20/                            # Node.js 20 (LTS)
+├── node22/                            # Node.js 22 (Active LTS)
 │   ├── dev/
 │   │   └── Dockerfile                 # Imagen de desarrollo
 │   └── runtime/
 │       └── Dockerfile                 # Imagen de producción
 │
-├── node22/                            # Node.js 22 (LTS)
-│   ├── dev/
-│   │   └── Dockerfile                 # Imagen de desarrollo
-│   └── runtime/
-│       └── Dockerfile                 # Imagen de producción
-│
-└── node24/                            # Node.js 24
+└── node24/                            # Node.js 24 (Active LTS)
     ├── dev/
     │   └── Dockerfile                 # Imagen de desarrollo
     └── runtime/
@@ -126,8 +133,8 @@ Guía para contribuyentes que cubre:
 
 Política de seguridad que documenta:
 
-- Advertencia crítica sobre Node.js 14 EOL incluso 18 y menores estan EOL.
-- Prácticas de seguridad implementadas.
+- Estado de soporte de cada versión de Node.js (EOL, Maintenance, Active LTS).
+- Prácticas de seguridad implementadas (non-root, digests, BuildKit, multi-stage, tini, SBOM).
 - Herramientas de escaneo recomendadas.
 - Política de reporte de vulnerabilidades.
 - Recomendaciones para equipos consumidores.
@@ -143,6 +150,33 @@ Licencia corporativa que establece:
 - Uso autorizado del repositorio.
 - Restricciones de distribución.
 - Exención de responsabilidad.
+
+### política_corporativa_imagenes_base_docker_node.js.md
+
+Política corporativa completa que define:
+
+- Tipos de imágenes (dev vs runtime) y sus restricciones de uso.
+- Política de imágenes base Debian (tags flotantes en dev, digests en runtime).
+- Política de versiones Node.js y restricciones EOL.
+- Hardening, pipeline, escaneo de vulnerabilidades y supply chain.
+- Trazabilidad OCI, excepciones y responsabilidades.
+
+### política_rotación_de_digests_docker_base.md
+
+Documento operativo complementario que define:
+
+- Procedimiento de rotación de digests SHA256 en etapas runtime.
+- Frecuencias de revisión (mensual, inmediata ante CVEs críticas).
+- Pasos de validación obligatorios.
+- Tabla de digests actuales del repositorio.
+
+### EJEMPLO NODE 14.md
+
+Guía técnica de ejemplo para la construcción de la imagen Node.js 14, incluyendo Dockerfile de referencia, comandos de build, pruebas y checklist de seguridad.
+
+### Mejoras_de_trazabilidad.txt
+
+Instrucciones pendientes de implementación para agregar labels OCI a los Dockerfiles y al pipeline CI/CD.
 
 ## Pipeline GitLab CI/CD
 
@@ -187,10 +221,10 @@ Placeholder para script de pruebas de humo que valida el funcionamiento básico 
 
 ## Próximos Pasos Recomendados
 
-1. **Inicializar repositorio Git:** `git init` y configurar origen remoto en GitLab.
-2. **Completar archivos placeholder:** Rellenar `labels.env`, `npmrc`, certificados y scripts.
+1. **Completar archivos placeholder:** Rellenar `labels.env`, `npmrc`, certificados y scripts.
+2. **Implementar labels OCI:** Aplicar las instrucciones de `Mejoras_de_trazabilidad.txt` a los Dockerfiles y al pipeline CI/CD.
 3. **Probar construcción local:** Construir una imagen de prueba localmente.
 4. **Configurar GitLab:** Establecer variables de entorno para CI/CD (registry, credenciales).
 5. **Publicar en registry:** Ejecutar el pipeline para publicar las imágenes.
-6. **Documentar excepciones de seguridad:** Formalizar la aceptación de riesgo para Node.js 14 EOL.
+6. **Documentar excepciones de seguridad:** Formalizar la aceptación de riesgo para Node.js 14 y 16 EOL.
 

@@ -113,8 +113,8 @@ El repositorio incluye un archivo `.gitlab-ci.yml` configurado para construir, p
 
 ## Advertencias Importantes
 
-*   **Node.js 14 y 16 EOL (CRÍTICO):** Las versiones 14 y 16 han alcanzado su Fin de Vida (EOL). Su uso representa un riesgo de seguridad crítico ya que no reciben parches. Deben utilizarse **únicamente** para soportar aplicaciones *legacy* existentes que no puedan ser migradas de inmediato. **Prohibido su uso en proyectos nuevos.**
-*   **Node.js 18 y 20 (Maintenance LTS):** Versiones en mantenimiento. Seguras para producción pero se recomienda planificar su migración.
-*   **Node.js 22 (Active LTS):** Versión recomendada corporativamente para todos los nuevos proyectos y migraciones.
+*   **Node.js 14, 16 y 18 EOL (CRÍTICO):** Las versiones 14, 16 y 18 han alcanzado su Fin de Vida (EOL). Su uso representa un riesgo de seguridad crítico ya que no reciben parches. Deben utilizarse **únicamente** para soportar aplicaciones *legacy* existentes que no puedan ser migradas de inmediato. **Prohibido su uso en proyectos nuevos.**
+*   **Node.js 20 (Maintenance LTS):** Versión en mantenimiento (EOL Abril 2026). Segura para producción pero se recomienda planificar migración a Node 22 o 24.
+*   **Node.js 22 y 24 (Active LTS):** Versiones recomendadas corporativamente para todos los nuevos proyectos y migraciones.
 *   **Inmutabilidad:** Las imágenes `runtime` están diseñadas para ser inmutables. No intentes modificar el contenedor en tiempo de ejecución. Cualquier cambio debe realizarse actualizando el código fuente y generando una nueva imagen.
 *   **Manejo de Señales:** Aunque las imágenes incluyen `tini`, es responsabilidad del equipo de desarrollo asegurar que la aplicación Node.js procese correctamente las señales de apagado (`SIGTERM`) para un cierre controlado.
