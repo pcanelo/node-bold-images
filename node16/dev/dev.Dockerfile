@@ -1,13 +1,12 @@
-# Imagen base corporativa DEV para Node.js 18
-# Utilizamos Debian 12 Bookworm Slim para versiones recientes de Node.js
-# FROM debian@sha256:67b30a61dc87758f0caf819646104f29ecbda97d920aaf5edc834128ac8493d3
-FROM debian:bookworm-slim
+# Imagen base corporativa DEV para Node.js 16
+FROM debian@sha256:89400a8b54c93d61bb2f971f1ada1d907b344f2422afabf23699fdf1f162faa0
+
 LABEL maintainer="Equipo de Arquitectura y Seguridad <arquitectura@empresa.com>"
-LABEL version="1.0.0"
-LABEL description="Imagen base corporativa DEV para Node.js 18 sobre Debian Slim"
+LABEL version="1.0.1"
+LABEL description="Imagen base corporativa DEV para Node.js 16 sobre Debian Slim"
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV NODE_VERSION=18.20.8
+ENV NODE_VERSION=16.20.2
 ENV ARCH=x64
 ENV WORKDIR=/usr/src/app
 
@@ -15,6 +14,11 @@ ENV NPM_CONFIG_FUND=false
 ENV NPM_CONFIG_AUDIT=false
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false
 ENV NPM_CONFIG_LOGLEVEL=warn
+
+# 1. Creación de usuario arriba (Optimización de Caché)
+RUN groupadd -g 10001 nodegroup && \
+    useradd -u 10001 -g nodegroup -s /bin/bash -m nodeuser && \
+    mkdir -p ${WORKDIR}
 
 # Herramientas permitidas en DEV
 RUN apt-get update && \
@@ -41,22 +45,20 @@ RUN curl -fsSLO https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt && \
     grep " node-v${NODE_VERSION}-linux-${ARCH}.tar.xz\$" SHASUMS256.txt | sha256sum -c - && \
     mkdir -p /tmp/node && \
     tar -xJf "node-v${NODE_VERSION}-linux-${ARCH}.tar.xz" -C /usr/local --strip-components=1 && \
-    rm -rf /tmp/*
+    rm -rf /tmp/* \
+    && ln -s /usr/local/bin/node /usr/local/bin/nodejs
 
-# Usuario no-root igual que PROD
-RUN groupadd -g 10001 nodegroup && \
-    useradd -u 10001 -g nodegroup -s /bin/bash -m nodeuser && \
-    mkdir -p ${WORKDIR} && \
-    chown -R nodeuser:nodegroup ${WORKDIR}
+# Instalación de gestores globales (pnpm@8 asegura compatibilidad con Node 16)
+RUN npm install -g yarn@1.22.19 pnpm@8 && npm cache clean --force
 
-RUN ln -s /usr/local/bin/node /usr/local/bin/nodejs
+# Ajuste del WORKDIR al final
+RUN chown -R nodeuser:nodegroup ${WORKDIR}
 
 WORKDIR ${WORKDIR}
-
 USER nodeuser
 
-RUN node -v && npm -v && git --version
+# Verificación de integridad en el build
+RUN node -v && npm -v && yarn -v && pnpm -v && git --version
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-
 CMD ["bash"]
